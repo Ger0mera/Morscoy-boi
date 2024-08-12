@@ -7,6 +7,7 @@
 #4) класс вектора(координаты x y, векторные операции)
 
 import random
+from enum import Enum
 
 
 class Vector:
@@ -28,6 +29,16 @@ class Ship:
         self.size = size
         self.position = position
         self.direction = direction
+        self.modules = []
+        self.is_alive = True
+    def hit(self, point: Vector):
+        if self.check_collision(point):
+            if len(self.modules) < self.size:
+                self.modules.append(point)
+                return True
+            self.is_alive = False
+        return False
+
 
     def check_collision(self, point: Vector) -> bool:
         for i in range(self.size):
@@ -36,12 +47,18 @@ class Ship:
                 return True
         return False
 
-
+class State(Enum):
+    SHIP = "■"
+    VOID = "."
+    BITE = "X"
 class PlayingField:
     def __init__(self, size: int, ships: list[Ship] = None):
         self.size = size
         self.matrix = [["." for _ in range(size)] for _ in range(size)]
         self.ships = ships if ships else []
+
+    def mark_cell(self, state: State, point: Vector):
+        self.matrix[point.x][point.y] = state
 
     def generation(self, size: int):
         while True:
@@ -67,7 +84,7 @@ class PlayingField:
             for s in self.ships:
                 for cel in range(s.size):
                     other_pos = s.position + (s.direction * cel)
-                    if abs(other_pos.x - ship_pos.x) == 1 or abs(other_pos.y - ship_pos.y) == 1:
+                    if abs(other_pos.x - ship_pos.x) + abs(other_pos.y - ship_pos.y) <= 2:
                         return False
         return True
 
@@ -81,21 +98,44 @@ class PlayingField:
             size = 5 - i
             for _ in range(i):
                 self.generation(size)
-                self.draw()
                 print()
 
     def draw(self) -> None:
-        for row in self.matrix:
-            print(" ".join(row))
+        abc = ""
+        for i in range(ord("A"), ord("A") + self.size):
+            abc += f"  {chr(i)}"
+        print(abc.rjust(3 * self.size + 1))
+        for i, row in enumerate(self.matrix):
+            print(str(i + 1).ljust(2), end=" ")
+            print("  ".join(row))
 
 
-class ManagerGame:
-    def __init__(self):
-        self.field = PlayingField(10)
+class Player:
+    def __init__(self, size: int):
+        self.field = PlayingField(size)
+        self.enemy_field = PlayingField(size)
         self.field.generationfield()
-        self.field.draw()
+
+    def move(self, other: "Player", x: int, y: int):
+        for i in other.field.ships:
+            if i.hit(Vector(x, y)):
+                self.enemy_field.mark_cell(State.BITE)
+                other.field.mark_cell(State.BITE)
+                return
+        self.enemy_field.mark_cell(State.VOID)
+        other.field.mark_cell(State.VOID)
+class ManagerGame:
+    def __init__(self, size: int):
+        self.player1 = Player(size)
+        self.player2 = Player(size)
+    def start(self):
+        self.player1.field.generationfield()
+        self.player2.field.generationfield()
+        self.player1.field.draw()
+        self.player1.enemy_field.draw()
+
 
 
 if __name__ == "__main__":
-    game = ManagerGame()
-
+    game = ManagerGame(10)
+    game.start()
