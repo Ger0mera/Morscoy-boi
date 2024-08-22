@@ -19,6 +19,10 @@ class Vector:
         x = self.x + other.x
         y = self.y + other.y
         return Vector(x, y)
+    def __sub__(self, other):
+        x = self.x - other.x
+        y = self.y - other.y
+        return Vector(x, y)
 
     def __mul__(self, number: int | float) -> 'Vector':
         return Vector(self.x * number, self.y * number)
@@ -31,6 +35,7 @@ class Ship:
         self.direction = direction
         self.modules = []
         self.is_alive = True
+
     def hit(self, point: Vector):
         if self.check_collision(point):
             if len(self.modules) < self.size:
@@ -39,6 +44,25 @@ class Ship:
             self.is_alive = False
         return False
 
+    def get_neighboor(self) -> list[Vector]:
+        result = []
+        ship_cells = set()
+        for i in range(self.size):
+            ship_pos = self.position + (self.direction * i)
+            ship_cells.add(ship_pos)
+            result + Ship.get_neighboorcell(ship_pos)
+        result = set(result)
+        result = result.difference(ship_cells)
+        result = list(result)
+        return result
+
+    @staticmethod
+    def get_neighboorcell(cell: Vector) -> list[Vector]:
+        cells = []
+        for i in range(cell.x - 1, cell.x + 2):
+            for j in range(cell.y - 1, cell.y + 2):
+                cells.append(Vector(i, j))
+        return cells
 
     def check_collision(self, point: Vector) -> bool:
         for i in range(self.size):
@@ -47,10 +71,13 @@ class Ship:
                 return True
         return False
 
+
 class State(Enum):
     SHIP = "■"
-    VOID = "."
+    VOID = "-"
     BITE = "X"
+
+
 class PlayingField:
     def __init__(self, size: int, ships: list[Ship] = None):
         self.size = size
@@ -58,7 +85,7 @@ class PlayingField:
         self.ships = ships if ships else []
 
     def mark_cell(self, state: State, point: Vector):
-        self.matrix[point.x][point.y] = state
+        self.matrix[point.x][point.y] = state.value
 
     def generation(self, size: int):
         while True:
@@ -114,28 +141,42 @@ class Player:
     def __init__(self, size: int):
         self.field = PlayingField(size)
         self.enemy_field = PlayingField(size)
-        self.field.generationfield()
 
     def move(self, other: "Player", x: int, y: int):
+        point = Vector(x, y)
         for i in other.field.ships:
             if i.hit(Vector(x, y)):
-                self.enemy_field.mark_cell(State.BITE)
-                other.field.mark_cell(State.BITE)
+                self.enemy_field.mark_cell(State.BITE, point)
+                other.field.mark_cell(State.BITE, point)
+                if not i.is_alive:
+                    result = i.get_neighboor()
+                    for point in result:
+                        self.enemy_field.mark_cell(State.VOID, point)
+                        other.field.mark_cell(State.VOID, point)
                 return
-        self.enemy_field.mark_cell(State.VOID)
-        other.field.mark_cell(State.VOID)
+        self.enemy_field.mark_cell(State.VOID, point)
+        other.field.mark_cell(State.VOID, point)
+
+
 class ManagerGame:
     def __init__(self, size: int):
         self.player1 = Player(size)
         self.player2 = Player(size)
+        self.winner = 0
+
     def start(self):
         self.player1.field.generationfield()
         self.player2.field.generationfield()
         self.player1.field.draw()
         self.player1.enemy_field.draw()
 
+    def mainloop(self):
+        while self.winner == 0:
+            x, y = tuple(map(int, input("(x,y):").split()))
+            self.player1.move(self.player2, x, y)
 
 
 if __name__ == "__main__":
     game = ManagerGame(10)
     game.start()
+    game.mainloop()
